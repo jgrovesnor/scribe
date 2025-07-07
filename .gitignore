@@ -1,0 +1,13 @@
+# Environment variables
+.env
+.DS_Store
+
+# Debug files
+*.log
+transcript*.json
+transcript*.txt
+*-debug.json
+
+# Dependencies
+node_modules/
+dist/ 

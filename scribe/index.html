@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scribe - YouTube Transcription</title>
+    <!-- SVG favicon with animation -->
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <!-- PNG fallback for browsers that don't support SVG -->
+    <link rel="alternate icon" type="image/png" href="../assets/favicon.png">
+    <link href="/dist/output.css?v=1" rel="stylesheet">
+    <style>
+        body {
+            background-color: #1E1E1E !important; /* Cursor's grey background */
+        }
+
+        /* Add Progress Steps Styles */
+        .progress-steps {
+            display: none; /* Hidden by default */
+            justify-content: space-between;
+            margin-top: 2rem;
+            padding: 1rem;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            color: #9CA3AF;
+        }
+
+        .step-number {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 9999px;
+            background-color: #374151;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 0.5rem;
+            font-weight: bold;
+        }
+
+        .step.active {
+            color: #4CAF50;
+        }
+
+        .step.active .step-number {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .step.completed {
+            color: #4CAF50;
+        }
+
+        .step.completed .step-number {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex items-center justify-center bg-[#1E1E1E]">
+    <div class="w-full max-w-2xl mx-4">
+        <!-- Header -->
+        <h1 class="text-4xl font-bold text-center text-white mb-2">Scribe</h1>
+        <p class="text-center text-white mb-8">Enter a YouTube URL to get started</p>
+
+        <!-- URL Input Form -->
+        <form id="transcribeForm" class="bg-white shadow-lg rounded-lg p-6">
+            <div class="mb-4">
+                <input 
+                    id="urlInput"
+                    name="url"
+                    type="url" 
+                    placeholder="https://www.youtube.com/watch?v=..." 
+                    class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                >
+            </div>
+            <button 
+                type="submit" 
+                id="submitButton"
+                class="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg transition duration-200"
+            >
+                Transcribe
+            </button>
+        </form>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden mt-8 text-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-green-500 mx-auto"></div>
+            <p class="mt-4 text-white text-lg">Generating summary...</p>
+        </div>
+
+        <!-- Summary -->
+        <div id="summary" class="hidden mt-8 bg-white shadow-lg rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Summary</h2>
+                <button 
+                    onclick="copySummary(event)"
+                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                    </svg>
+                    Copy
+                </button>
+            </div>
+            <div id="summaryContent" class="text-gray-700"></div>
+        </div>
+
+        <!-- After the Summary div, add: -->
+        <div id="qaSection" class="hidden mt-8 bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-2xl font-bold mb-4">Ask Questions About the Video</h2>
+            <div id="chatHistory" class="mb-4 max-h-96 overflow-y-auto space-y-4 p-4 bg-gray-50 rounded-lg">
+                <!-- Chat messages will be inserted here -->
+            </div>
+            <form id="questionForm" class="flex flex-col gap-3">
+                <textarea 
+                    id="questionInput"
+                    placeholder="Ask a question about the video..." 
+                    class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none h-24"
+                    required
+                ></textarea>
+                <button 
+                    type="submit"
+                    class="bg-green-500 hover:bg-green-600 text-white font-medium py-3 px-4 rounded-lg transition duration-200"
+                >
+                    Ask Question
+                </button>
+            </form>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="hidden mt-8 bg-red-50 text-red-500 p-4 rounded-lg">
+        </div>
+
+        <!-- Add progress steps -->
+        <div class="progress-steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <div class="step-label">Fetching Video</div>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <div class="step-label">Extracting Transcript</div>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <div class="step-label">Generating Summary</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateProgress(step) {
+            const steps = document.querySelectorAll('.step');
+            const progressSteps = document.querySelector('.progress-steps');
+            
+            progressSteps.style.display = 'flex';
+            
+            steps.forEach((stepEl, index) => {
+                if (index < step) {
+                    stepEl.classList.add('completed');
+                    stepEl.classList.remove('active');
+                } else if (index === step) {
+                    stepEl.classList.add('active');
+                    stepEl.classList.remove('completed');
+                } else {
+                    stepEl.classList.remove('completed', 'active');
+                }
+            });
+        }
+
+        let currentTranscript = null; // Store the transcript globally
+
+        document.getElementById('transcribeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const form = e.target;
+            const url = form.url.value;
+            const submitButton = document.getElementById('submitButton');
+            const loadingState = document.getElementById('loadingState');
+            const summary = document.getElementById('summary');
+            const errorMessage = document.getElementById('errorMessage');
+            const summaryContent = document.getElementById('summaryContent');
+
+            // Reset states
+            summary.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            
+            // Show loading state and start progress
+            submitButton.disabled = true;
+            loadingState.classList.remove('hidden');
+            updateProgress(0); // Start with first step
+
+            try {
+                updateProgress(1);
+                
+                const response = await fetch('http://localhost:3001/api/transcript', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await response.json();
+                currentTranscript = data.transcript; // Store the transcript
+                console.log('Response data:', data);
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to get transcript');
+                }
+
+                updateProgress(2);
+
+                // Display summary
+                console.log('Setting summary:', data.summary);
+                summaryContent.textContent = data.summary;
+                summary.classList.remove('hidden');
+                
+                // Complete progress and hide loading state
+                setTimeout(() => {
+                    document.querySelector('.progress-steps').style.display = 'none';
+                    loadingState.classList.add('hidden');
+                }, 1000);
+
+                // Show Q&A section after summary
+                document.getElementById('qaSection').classList.remove('hidden');
+
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.classList.remove('hidden');
+                document.querySelector('.progress-steps').style.display = 'none';
+                loadingState.classList.add('hidden');
+            } finally {
+                submitButton.disabled = false;
+            }
+        });
+
+        async function copySummary(event) {
+            const summaryContent = document.getElementById('summaryContent').textContent;
+            try {
+                await navigator.clipboard.writeText(summaryContent);
+                const copyButton = event.currentTarget;
+                const originalText = copyButton.textContent;
+                copyButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyButton.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+            }
+        }
+
+        // Add question form handler
+        document.getElementById('questionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const question = document.getElementById('questionInput').value;
+            const chatHistory = document.getElementById('chatHistory');
+
+            // Add user question to chat
+            chatHistory.innerHTML += `
+                <div class="flex justify-end mb-4">
+                    <div class="bg-green-100 rounded-lg py-3 px-4 max-w-[80%] shadow">
+                        <p class="text-gray-800 whitespace-pre-wrap">${question}</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch('http://localhost:3001/api/question', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        question,
+                        transcript: currentTranscript 
+                    })
+                });
+
+                const data = await response.json();
+
+                // Add AI response to chat
+                chatHistory.innerHTML += `
+                    <div class="flex justify-start mb-4">
+                        <div class="bg-gray-100 rounded-lg py-3 px-4 max-w-[80%] shadow">
+                            <p class="text-gray-800 whitespace-pre-wrap">${data.answer}</p>
+                        </div>
+                    </div>
+                `;
+
+                // Clear input
+                document.getElementById('questionInput').value = '';
+                
+                // Scroll to bottom
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+    </script>
+</body>
+</html> 

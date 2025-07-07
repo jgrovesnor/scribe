@@ -1,0 +1,24 @@
+{
+  "name": "scribe",
+  "version": "1.0.0",
+  "scripts": {
+    "tailwind-init": "tailwindcss init -p",
+    "build:css": "tailwindcss -i ./src/input.css -o ./dist/output.css --watch",
+    "serve": "http-server src -p 3000",
+    "scrape": "node src/scraper.js",
+    "server": "node src/server.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.41.1",
+    "autoprefixer": "^10.4.17",
+    "http-server": "^14.1.1",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.1"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "openai": "^4.80.1"
+  }
+}
